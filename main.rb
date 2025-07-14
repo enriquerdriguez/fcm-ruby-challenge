@@ -36,6 +36,10 @@ class MainApp
 
     puts segment_lines
 
+    # Step 2: create segments from content
+    segments = segment_lines.map { |line| Segment.parse(line) }
+
+    puts segments
   end
 end
 
