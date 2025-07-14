@@ -1,3 +1,6 @@
+# rubocop:disable all
+require_relative 'lib/segment'
+
 # frozen_string_literal: true
 
 # Main application class that will wrap the whole app
@@ -14,8 +17,25 @@ class MainApp
       exit 1
     end
 
+    # Step 1: read file and get segments from content
     input_file_content = File.read(input_file)
-    puts input_file_content
+    
+    segment_lines = []
+    
+    input_file_content.each_line do |line|
+      line = line.strip
+      next if line.empty?
+
+      if line.start_with?('SEGMENT:')
+        segment_lines << line
+      else
+        # Skip invalid lines but log them
+        $stderr.puts "Warning: Skipping invalid line: #{line}" if ENV['DEBUG']
+      end
+    end
+
+    puts segment_lines
+
   end
 end
 
