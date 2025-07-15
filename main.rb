@@ -17,29 +17,36 @@ class MainApp
       exit 1
     end
 
-    # Step 1: read file and get segments from content
-    input_file_content = File.read(input_file)
-    
-    segment_lines = []
-    
-    input_file_content.each_line do |line|
-      line = line.strip
-      next if line.empty?
+    begin
+      # Step 1: read file and get segments from content
+      input_file_content = File.read(input_file)
+      
+      segment_lines = []
+      
+      input_file_content.each_line do |line|
+        line = line.strip
+        next if line.empty?
 
-      if line.start_with?('SEGMENT:')
-        segment_lines << line
-      else
-        # Skip invalid lines but log them
-        $stderr.puts "Warning: Skipping invalid line: #{line}" if ENV['DEBUG']
+        if line.start_with?('SEGMENT:')
+          segment_lines << line
+        else
+          # Skip invalid lines but log them
+          $stderr.puts "Warning: Skipping invalid line: #{line}" if ENV['DEBUG']
+        end
       end
+
+      puts segment_lines
+
+      # Step 2: create segments from content
+      segments = segment_lines.map { |line| Segment.parse(line) }
+
+      puts segments
+    rescue ItineraryErrors::ItineraryError => e
+      puts "Unexpected Error: #{e.message}"
+      exit 1
     end
 
-    puts segment_lines
 
-    # Step 2: create segments from content
-    segments = segment_lines.map { |line| Segment.parse(line) }
-
-    puts segments
   end
 end
 

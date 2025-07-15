@@ -2,9 +2,11 @@
 # rubocop:disable all
 
 require 'date'
+require_relative 'errors'
 
 # Represents a single travel segment (flight, train, hotel)
 class Segment
+  include ItineraryErrors
 
   attr_reader :type, :departure_airport, :arrival_airport, :departure_time, :arrival_time, :check_in_date, :check_out_date
 
@@ -22,6 +24,7 @@ class Segment
     @check_in_date = check_in_date
     @check_out_date = check_out_date
 
+    validate!
   end
 
   def self.parse(line)
@@ -29,14 +32,14 @@ class Segment
     # or "SEGMENT: Hotel BCN 2023-01-05 -> 2023-01-10"
     
     unless line.start_with?('SEGMENT:')
-      raise StandardError, "Invalid segment format: #{line}"
+      raise InvalidSegmentError, "Invalid segment format: #{line}"
     end
 
     parts = line.split('SEGMENT:').last.strip.split
     type = parts[0]
 
     unless SEGMENT_TYPES.include?(type)
-      raise StandardError, "Invalid segment type: #{type}"
+      raise InvalidSegmentError, "Invalid segment type: #{type}"
     end
 
     # TODO: refactor this to use a factory pattern
@@ -46,7 +49,7 @@ class Segment
     when 'Hotel'
       parse_hotel_segment(parts)
     else
-      raise StandardError, "Unsupported segment type: #{type}"
+      raise InvalidSegmentError, "Unsupported segment type: #{type}"
     end
   end
 
@@ -118,15 +121,19 @@ class Segment
   end
 
   def self.parse_datetime(datetime_str)
+    raise "Datetime cannot be nil: #{datetime_str}" if datetime_str.nil?
+    
     DateTime.parse(datetime_str)
   rescue ArgumentError => e
-    raise StandardError, "Invalid datetime format: #{datetime_str} - #{e.message}"
+    raise DateTimeParseError, "Invalid datetime format: #{datetime_str} - #{e.message}"
   end
 
   def self.parse_date(date_str)
+    raise DateTimeParseError, "Invalid date format for nil" if date_str.nil?
+    
     Date.parse(date_str)
   rescue ArgumentError => e
-    raise StandardError, "Invalid date format: #{date_str} - #{e.message}"
+    raise DateTimeParseError, "Invalid date format: #{date_str} - #{e.message}"
   end
 
   def format_datetime(datetime)
@@ -140,4 +147,48 @@ class Segment
   def format_date(date)
     date.strftime('%Y-%m-%d')
   end
-end 
+
+  def validate!
+    validate_type
+    validate_airports
+    validate_times
+  end
+
+  def validate_type
+    unless SEGMENT_TYPES.include?(@type)
+      raise InvalidSegmentError, "Invalid segment type: #{@type}"
+    end
+  end
+
+  def validate_airports
+    if transport?
+      validate_iata_code(@departure_airport, 'departure_airport')
+      validate_iata_code(@arrival_airport, 'arrival_airport')
+    elsif hotel?
+      validate_iata_code(@arrival_airport, 'arrival_airport')
+    end
+  end
+
+  def validate_iata_code(code, field_name)
+    return if code.nil?
+    unless code.match?(IATA_CODE_REGEX)
+      raise InvalidSegmentError, "Invalid #{field_name}: #{code}"
+    end
+  end
+
+  def validate_times
+    if transport?
+      if @departure_time.nil? || @arrival_time.nil?
+        raise InvalidSegmentError, "Transport segments must have departure and arrival times"
+      end
+    elsif hotel?
+      if @check_in_date.nil? || @check_out_date.nil?
+        raise InvalidSegmentError, "Hotel segments must have check-in and check-out dates"
+      end
+      
+      if @check_in_date >= @check_out_date
+        raise InvalidSegmentError, "Check-in date must be before check-out date"
+      end
+    end
+  end
+end
