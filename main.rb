@@ -1,11 +1,14 @@
 # rubocop:disable all
 require_relative 'lib/segment'
 require_relative 'lib/trip'
+require 'pry'
 
 # frozen_string_literal: true
 
 # Main application class that will wrap the whole app
 class MainApp
+  IATA_CODE_REGEX = /^[A-Z]{3}$/.freeze
+
   def self.run
     new.run
   end
@@ -21,6 +24,8 @@ class MainApp
     begin
       # Step 1: read file and get segments from content
       input_file_content = File.read(input_file)
+      base_airport = ENV['BASED']
+      validate_iata(base_airport)
       
       segment_lines = []
       
@@ -40,7 +45,7 @@ class MainApp
       segments = segment_lines.map { |line| Segment.parse(line) }
 
       # Step 3: Build trips from segments
-      trips = Trip.group_segments(segments, 'SVQ')
+      trips = Trip.group_segments(segments, base_airport)
 
       puts trips
 
@@ -50,6 +55,15 @@ class MainApp
     end
 
 
+  end
+
+  private
+  def validate_iata(iata_code)
+    raise ItineraryErrors::InvalidIataCodeError, "IATA code is required" if iata_code.nil? || iata_code.empty?
+
+    unless iata_code.match?(IATA_CODE_REGEX)
+      raise ItineraryErrors::InvalidSegmentError, "Invalid IATA code: #{iata_code}"
+    end
   end
 end
 

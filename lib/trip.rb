@@ -20,6 +20,8 @@ class Trip
 
     # each trip should start with a transport segment leaving the base IATA
     initial_point_segments = sorted.select { |segment| segment.departure_airport == base_airport }
+    raise ItineraryErrors::InvalidSegmentError, "There are no segments that start from the base IATA #{base_airport}" if initial_point_segments.empty?
+
     sorted = sorted - initial_point_segments
 
     trips = []
@@ -72,7 +74,7 @@ class Trip
   end
 
   def to_s
-    return "TRIP to #{@destination}" if @segments.empty?
+    return if @segments.empty?
 
     lines = ["TRIP to #{@destination}"]
     @segments.each do |segment|
