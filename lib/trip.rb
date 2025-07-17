@@ -36,12 +36,16 @@ class Trip
       while current_location != base_airport && !sorted.empty?
         # Find next segment that matches our current location and time
         next_segment = sorted.find do |segment|
+          # Next segment should happen from the same location and within 24 hours
+          # Substracting Date objects returns a float number of days
           if segment.transport?
             segment.departure_airport == current_location && 
-            segment.departure_time >= current_time
+            segment.departure_time >= current_time &&
+            (segment.departure_time - current_time) <= 1.0
           else
             segment.arrival_airport == current_location &&
-            segment.check_in_date >= current_time.to_date
+            segment.check_in_date >= current_time.to_date &&
+            (segment.check_in_date - current_time.to_date) <= 1.0
           end
         end
 
