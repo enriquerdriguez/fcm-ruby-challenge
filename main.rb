@@ -62,7 +62,7 @@ class MainApp
     raise ItineraryErrors::InvalidIataCodeError, "IATA code is required" if iata_code.nil? || iata_code.empty?
 
     unless iata_code.match?(IATA_CODE_REGEX)
-      raise ItineraryErrors::InvalidSegmentError, "Invalid IATA code: #{iata_code}"
+      raise ItineraryErrors::InvalidIataCodeError, "Invalid IATA code: #{iata_code}"
     end
   end
 end

@@ -11,4 +11,7 @@ module ItineraryErrors
 
   # Error raised when IATA code is invalid
   class InvalidIataCodeError < ItineraryError; end
+
+  # Error raised when a trip is invalid
+  class InvalidTripError < ItineraryError; end
 end
