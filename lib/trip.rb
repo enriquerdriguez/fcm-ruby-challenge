@@ -68,11 +68,13 @@ class Trip
     trips.sort_by(&:earliest_date)
   end
 
+  # Find the earliest date from all segments
   def earliest_date
     dates = @segments.map { |segment| segment.transport? ? segment.departure_time : segment.check_in_date }
     dates.min
   end
 
+  # Return a string representation of the trip
   def to_s
     return if @segments.empty?
 
@@ -85,6 +87,7 @@ class Trip
 
   private
 
+  # Determine the destination of the trip
   def determine_destination
     # Find the destination by looking at the last unique destination from all segments thats is not the base IATA
     destinations = @segments.map(&:arrival_airport).uniq

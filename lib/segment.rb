@@ -27,6 +27,7 @@ class Segment
     validate!
   end
 
+  # Parse a segment from a line
   def self.parse(line)
     # Expected format: "SEGMENT: Flight SVQ 2023-03-02 06:40 -> BCN 09:10"
     # or "SEGMENT: Hotel BCN 2023-01-05 -> 2023-01-10"
@@ -53,22 +54,27 @@ class Segment
     end
   end
 
+  # Check if the segment is a transport segment
   def transport?
     %w[Flight Train].include?(@type)
   end
 
+  # Check if the segment is a hotel segment
   def hotel?
     @type == 'Hotel'
   end
 
+  # Get the departure date
   def departure_date
     @departure_time&.to_date
   end
 
+  # Get the arrival date
   def arrival_date
     @arrival_time&.to_date
   end
 
+  # Return a string representation of the segment
   def to_s
     if transport?
       "#{@type} from #{@departure_airport} to #{@arrival_airport} at #{format_datetime(@departure_time)} to #{format_time(@arrival_time)}"
@@ -77,6 +83,7 @@ class Segment
     end
   end
 
+  # Sort segments by date
   def self.sort_by_date(segments)
     segments.sort_by do |segment|
       if segment.transport?
@@ -89,6 +96,7 @@ class Segment
 
   private
 
+  # Parse a transport segment and creates an instance of Segment
   def self.parse_transport_segment(parts)
     # Format: "Flight SVQ 2023-03-02 06:40 -> BCN 09:10"
     type = parts[0]
@@ -115,6 +123,7 @@ class Segment
     )
   end
 
+  # Parse a hotel segment and creates an instance of Segment
   def self.parse_hotel_segment(parts)
     # Format: "Hotel BCN 2023-01-05 -> 2023-01-10"
     type = parts[0]
@@ -130,6 +139,7 @@ class Segment
     )
   end
 
+  # Parse a datetime string and creates an instance of DateTime
   def self.parse_datetime(datetime_str)
     raise "Datetime cannot be nil: #{datetime_str}" if datetime_str.nil?
     
@@ -138,6 +148,7 @@ class Segment
     raise DateTimeParseError, "Invalid datetime format: #{datetime_str} - #{e.message}"
   end
 
+  # Parse a date string and creates an instance of Date
   def self.parse_date(date_str)
     raise DateTimeParseError, "Invalid date format for nil" if date_str.nil?
     
@@ -146,30 +157,36 @@ class Segment
     raise DateTimeParseError, "Invalid date format: #{date_str} - #{e.message}"
   end
 
+  # Format a datetime to a string
   def format_datetime(datetime)
     datetime.strftime('%Y-%m-%d %H:%M')
   end
 
+  # Format a time to a string
   def format_time(datetime)
     datetime.strftime('%H:%M')
   end
 
+  # Format a date to a string
   def format_date(date)
     date.strftime('%Y-%m-%d')
   end
 
+  # Validations for Segment creation
   def validate!
     validate_type
     validate_airports
     validate_times
   end
 
+  # Validate the type of the segment
   def validate_type
     unless SEGMENT_TYPES.include?(@type)
       raise InvalidSegmentError, "Invalid segment type: #{@type}"
     end
   end
 
+  # Validate the airports of the segment
   def validate_airports
     if transport?
       validate_iata_code(@departure_airport, 'departure_airport')
@@ -179,6 +196,7 @@ class Segment
     end
   end
 
+  # Validate the IATA code of the segment
   def validate_iata_code(code, field_name)
     return if code.nil?
     unless code.match?(IATA_CODE_REGEX)
@@ -186,6 +204,7 @@ class Segment
     end
   end
 
+  # Validate the times of the segment
   def validate_times
     if transport?
       if @departure_time.nil? || @arrival_time.nil?
