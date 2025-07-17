@@ -1,5 +1,6 @@
 # rubocop:disable all
 require_relative 'lib/segment'
+require_relative 'lib/trip'
 
 # frozen_string_literal: true
 
@@ -35,12 +36,14 @@ class MainApp
         end
       end
 
-      puts segment_lines
-
       # Step 2: create segments from content
       segments = segment_lines.map { |line| Segment.parse(line) }
 
-      puts segments
+      # Step 3: Build trips from segments
+      trips = Trip.group_segments(segments, 'SVQ')
+
+      puts trips
+
     rescue ItineraryErrors::ItineraryError => e
       puts "Unexpected Error: #{e.message}"
       exit 1

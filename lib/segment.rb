@@ -77,6 +77,16 @@ class Segment
     end
   end
 
+  def self.sort_by_date(segments)
+    segments.sort_by do |segment|
+      if segment.transport?
+        segment.departure_time
+      else
+        segment.check_in_date.to_datetime
+      end
+    end
+  end
+
   private
 
   def self.parse_transport_segment(parts)
