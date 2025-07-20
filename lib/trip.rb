@@ -12,6 +12,26 @@ class Trip
     @destination = determine_destination
   end
 
+  # Method to validate the initial point segments, if there are no segments that start from the base IATA, raise an error
+  def self.validate_initial_point_segments(segments)
+    raise ItineraryErrors::InvalidTripError, "There are no segments that start from the base IATA #{@base_airport}" if segments.empty?
+  end
+
+  # Method to check if a segment is linked to the current location and time
+  def self.next_linked_segment?(segment, current_location, current_time)
+    return transport_segment_linked?(segment, current_location, current_time) if segment.transport?
+
+    hotel_segment_linked?(segment, current_location, current_time)
+  end
+
+  # Method to group segments into trips
+  # rubocop:disable all
+  # Time Complexity: O(n^2) where n is the number of segments
+  # - Initial sort of segments: O(n log n)
+  # - For each initial segment (worst case n/2):
+  #   - Inner while loop can process remaining segments (worst case n/2)
+  #   - Finding next linked segment is O(n) operation
+  # Space Complexity: O(n) for storing sorted segments and trips
   def self.group_segments(segments, base_airport)
     return [] if segments.empty?
 
@@ -20,10 +40,7 @@ class Trip
 
     # each trip should start with a transport segment leaving the base IATA
     initial_point_segments = sorted.select { |segment| segment.departure_airport == base_airport }
-    if initial_point_segments.empty?
-      raise ItineraryErrors::InvalidTripError,
-            "There are no segments that start from the base IATA #{base_airport}"
-    end
+    validate_initial_point_segments(initial_point_segments)
 
     sorted -= initial_point_segments
 
@@ -38,19 +55,7 @@ class Trip
       # Keep looking for connected segments until we return to base or run out of segments
       while current_location != base_airport && !sorted.empty?
         # Find next segment that matches our current location and time
-        next_segment = sorted.find do |segment|
-          # Next segment should happen from the same location and within 24 hours
-          # Substracting Date objects returns a float number of days
-          if segment.transport?
-            segment.departure_airport == current_location &&
-              segment.departure_time >= current_time &&
-              (segment.departure_time - current_time) <= 1.0
-          else
-            segment.arrival_airport == current_location &&
-              segment.check_in_date >= current_time.to_date &&
-              (segment.check_in_date - current_time.to_date) <= 1.0
-          end
-        end
+        next_segment = sorted.find { |segment| next_linked_segment?(segment, current_location, current_time) }
 
         break unless next_segment
 
@@ -59,11 +64,7 @@ class Trip
         sorted.delete(next_segment)
 
         current_location = next_segment.arrival_airport
-        current_time = if next_segment.transport?
-                         next_segment.arrival_time
-                       else
-                         next_segment.check_out_date.to_datetime
-                       end
+        current_time = next_segment.transport? ? next_segment.arrival_time : next_segment.check_out_date.to_datetime
       end
 
       # Add completed trip to trips array
@@ -73,6 +74,7 @@ class Trip
     # Order trips by earliest date
     trips.sort_by(&:earliest_date)
   end
+  # rubocop:enable all
 
   # Find the earliest date from all segments
   def earliest_date
@@ -89,6 +91,18 @@ class Trip
       lines << segment.to_s
     end
     lines.join("\n")
+  end
+
+  def self.transport_segment_linked?(segment, current_location, current_time)
+    segment.departure_airport == current_location &&
+      segment.departure_time >= current_time &&
+      (segment.departure_time - current_time) <= 1.0
+  end
+
+  def self.hotel_segment_linked?(segment, current_location, current_time)
+    segment.arrival_airport == current_location &&
+      segment.check_in_date >= current_time.to_date &&
+      (segment.check_in_date - current_time.to_date) <= 1.0
   end
 
   private
