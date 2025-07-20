@@ -13,8 +13,8 @@ class Trip
   end
 
   # Method to validate the initial point segments, if there are no segments that start from the base IATA, raise an error
-  def self.validate_initial_point_segments(segments)
-    raise ItineraryErrors::InvalidTripError, "There are no segments that start from the base IATA #{@base_airport}" if segments.empty?
+  def self.validate_initial_point_segments(segments, base_airport)
+    raise ItineraryErrors::InvalidTripError, "There are no segments that start from the base IATA #{base_airport}" if segments.empty?
   end
 
   # Method to check if a segment is linked to the current location and time
@@ -40,7 +40,7 @@ class Trip
 
     # each trip should start with a transport segment leaving the base IATA
     initial_point_segments = sorted.select { |segment| segment.departure_airport == base_airport }
-    validate_initial_point_segments(initial_point_segments)
+    validate_initial_point_segments(initial_point_segments, base_airport)
 
     sorted -= initial_point_segments
 
