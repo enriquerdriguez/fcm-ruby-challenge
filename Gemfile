@@ -6,6 +6,7 @@ ruby '3.1.4'
 
 group :development do
   gem 'pry'
+  gem 'rake'
   gem 'rubocop', '~> 1.50'
 end
 
