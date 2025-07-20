@@ -111,7 +111,7 @@ class Segment
 
     # Handle overnight flights
     if arrival_time < departure_time
-      arrival_time += 1.day
+      arrival_time += 1
     end
 
     new(
