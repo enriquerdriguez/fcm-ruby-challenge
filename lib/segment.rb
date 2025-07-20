@@ -1,5 +1,4 @@
 # frozen_string_literal: true
-# rubocop:disable all
 
 require 'date'
 require_relative 'errors'
@@ -8,13 +7,14 @@ require_relative 'errors'
 class Segment
   include ItineraryErrors
 
-  attr_reader :type, :departure_airport, :arrival_airport, :departure_time, :arrival_time, :check_in_date, :check_out_date
+  attr_reader :type, :departure_airport, :arrival_airport, :departure_time, :arrival_time, :check_in_date,
+              :check_out_date
 
   SEGMENT_TYPES = %w[Flight Train Hotel].freeze
   IATA_CODE_REGEX = /\A[A-Z]{3}\z/
 
-  def initialize(type:, departure_airport: nil, arrival_airport: nil, 
-                 departure_time: nil, arrival_time: nil, 
+  def initialize(type:, departure_airport: nil, arrival_airport: nil,
+                 departure_time: nil, arrival_time: nil,
                  check_in_date: nil, check_out_date: nil)
     @type = type
     @departure_airport = departure_airport
@@ -31,17 +31,13 @@ class Segment
   def self.parse(line)
     # Expected format: "SEGMENT: Flight SVQ 2023-03-02 06:40 -> BCN 09:10"
     # or "SEGMENT: Hotel BCN 2023-01-05 -> 2023-01-10"
-    
-    unless line.start_with?('SEGMENT:')
-      raise InvalidSegmentError, "Invalid segment format: #{line}"
-    end
+
+    raise InvalidSegmentError, "Invalid segment format: #{line}" unless line.start_with?('SEGMENT:')
 
     parts = line.split('SEGMENT:').last.strip.split
     type = parts[0]
 
-    unless SEGMENT_TYPES.include?(type)
-      raise InvalidSegmentError, "Invalid segment type: #{type}"
-    end
+    raise InvalidSegmentError, "Invalid segment type: #{type}" unless SEGMENT_TYPES.include?(type)
 
     # TODO: refactor this to use a factory pattern
     case type
@@ -94,8 +90,6 @@ class Segment
     end
   end
 
-  private
-
   # Parse a transport segment and creates an instance of Segment
   def self.parse_transport_segment(parts)
     # Format: "Flight SVQ 2023-03-02 06:40 -> BCN 09:10"
@@ -110,9 +104,7 @@ class Segment
     arrival_time = parse_datetime("#{date_str} #{arrival_time_str}")
 
     # Handle overnight flights
-    if arrival_time < departure_time
-      arrival_time += 1
-    end
+    arrival_time += 1 if arrival_time < departure_time
 
     new(
       type: type,
@@ -142,7 +134,7 @@ class Segment
   # Parse a datetime string and creates an instance of DateTime
   def self.parse_datetime(datetime_str)
     raise "Datetime cannot be nil: #{datetime_str}" if datetime_str.nil?
-    
+
     DateTime.parse(datetime_str)
   rescue ArgumentError => e
     raise DateTimeParseError, "Invalid datetime format: #{datetime_str} - #{e.message}"
@@ -150,12 +142,14 @@ class Segment
 
   # Parse a date string and creates an instance of Date
   def self.parse_date(date_str)
-    raise DateTimeParseError, "Invalid date format for nil" if date_str.nil?
-    
+    raise DateTimeParseError, 'Invalid date format for nil' if date_str.nil?
+
     Date.parse(date_str)
   rescue ArgumentError => e
     raise DateTimeParseError, "Invalid date format: #{date_str} - #{e.message}"
   end
+
+  private
 
   # Format a datetime to a string
   def format_datetime(datetime)
@@ -181,9 +175,9 @@ class Segment
 
   # Validate the type of the segment
   def validate_type
-    unless SEGMENT_TYPES.include?(@type)
-      raise InvalidSegmentError, "Invalid segment type: #{@type}"
-    end
+    return if SEGMENT_TYPES.include?(@type)
+
+    raise InvalidSegmentError, "Invalid segment type: #{@type}"
   end
 
   # Validate the airports of the segment
@@ -199,25 +193,19 @@ class Segment
   # Validate the IATA code of the segment
   def validate_iata_code(code, field_name)
     return if code.nil?
-    unless code.match?(IATA_CODE_REGEX)
-      raise InvalidSegmentError, "Invalid #{field_name}: #{code}"
-    end
+    return if code.match?(IATA_CODE_REGEX)
+
+    raise InvalidSegmentError, "Invalid #{field_name}: #{code}"
   end
 
   # Validate the times of the segment
   def validate_times
     if transport?
-      if @departure_time.nil? || @arrival_time.nil?
-        raise InvalidSegmentError, "Transport segments must have departure and arrival times"
-      end
+      raise InvalidSegmentError, 'Transport segments must have departure and arrival times' if @departure_time.nil? || @arrival_time.nil?
     elsif hotel?
-      if @check_in_date.nil? || @check_out_date.nil?
-        raise InvalidSegmentError, "Hotel segments must have check-in and check-out dates"
-      end
-      
-      if @check_in_date >= @check_out_date
-        raise InvalidSegmentError, "Check-in date must be before check-out date"
-      end
+      raise InvalidSegmentError, 'Hotel segments must have check-in and check-out dates' if @check_in_date.nil? || @check_out_date.nil?
+
+      raise InvalidSegmentError, 'Check-in date must be before check-out date' if @check_in_date >= @check_out_date
     end
   end
 end

@@ -52,34 +52,53 @@ RSpec.describe 'Integration Tests' do
 
     it 'raises error with NYC as base airport' do
       processor = ItineraryProcessor.new('NYC')
-      expect { processor.process_file('input.txt') }.to raise_error(ItineraryErrors::InvalidTripError, /There are no segments that start from the base IATA NYC/)
+      expect do
+        processor.process_file('input.txt')
+      end.to raise_error(ItineraryErrors::InvalidTripError,
+                         /There are no segments that start from the base IATA NYC/)
     end
   end
 
   describe 'with edge case input files' do
     it 'handles wrong segment type error' do
       processor = ItineraryProcessor.new('SVQ')
-      expect { processor.process_file('inputs/input_wrong_segment_type.txt') }.to raise_error(ItineraryErrors::InvalidSegmentError, /Invalid segment type: AIRBNB/)
+      expect do
+        processor.process_file('inputs/input_wrong_segment_type.txt')
+      end.to raise_error(ItineraryErrors::InvalidSegmentError,
+                         /Invalid segment type: AIRBNB/)
     end
 
     it 'handles wrong IATA code error' do
       processor = ItineraryProcessor.new('SVQ')
-      expect { processor.process_file('inputs/input_wrong_iata.txt') }.to raise_error(ItineraryErrors::InvalidSegmentError, /Invalid departure_airport: SQ/)
+      expect do
+        processor.process_file('inputs/input_wrong_iata.txt')
+      end.to raise_error(ItineraryErrors::InvalidSegmentError,
+                         /Invalid departure_airport: SQ/)
     end
 
     it 'handles wrong date format error' do
       processor = ItineraryProcessor.new('SVQ')
-      expect { processor.process_file('inputs/input_wrong_date_format.txt') }.to raise_error(ItineraryErrors::DateTimeParseError, /Invalid date format for nil/)
+      expect do
+        processor.process_file('inputs/input_wrong_date_format.txt')
+      end.to raise_error(ItineraryErrors::DateTimeParseError,
+                         /Invalid date format for nil/)
     end
 
     it 'handles wrong dates error' do
       processor = ItineraryProcessor.new('SVQ')
-      expect { processor.process_file('inputs/input_wrong_dates.txt') }.to raise_error(ItineraryErrors::DateTimeParseError, /Invalid datetime format/)
+      expect do
+        processor.process_file('inputs/input_wrong_dates.txt')
+      end.to raise_error(ItineraryErrors::DateTimeParseError,
+                         /Invalid datetime format/)
     end
 
     it 'handles wrong date inside out error' do
       processor = ItineraryProcessor.new('SVQ')
-      expect { processor.process_file('inputs/input_wrong_date_inside_out.txt') }.to raise_error(ItineraryErrors::InvalidSegmentError, /Check-in date must be before check-out date/)
+      expect do
+        processor.process_file('inputs/input_wrong_date_inside_out.txt')
+      end.to raise_error(
+        ItineraryErrors::InvalidSegmentError, /Check-in date must be before check-out date/
+      )
     end
   end
-end 
+end

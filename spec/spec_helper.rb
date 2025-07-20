@@ -7,7 +7,7 @@ require 'date'
 $LOAD_PATH.unshift File.expand_path('../lib', __dir__)
 
 # Load all files in the lib directory
-Dir[File.expand_path('../lib/*.rb', __dir__)].sort.each { |file| require file }
+Dir[File.expand_path('../lib/*.rb', __dir__)].each { |file| require file }
 
 # RSpec.configure do |config|
 #   # Enable flags like --only-failures and --next-failure

@@ -1,11 +1,11 @@
 # frozen_string_literal: true
-# rubocop:disable all
 
 require_relative 'segment'
 require_relative 'trip'
 
+# Class to process the input file, it reads the file, creates segments and builds trips
 class ItineraryProcessor
-  IATA_CODE_REGEX = /^[A-Z]{3}$/.freeze
+  IATA_CODE_REGEX = /^[A-Z]{3}$/
 
   # Initialize the processor with the base IATA code
   def initialize(base_airport)
@@ -22,14 +22,13 @@ class ItineraryProcessor
     segments = segment_lines.map { |line| Segment.parse(line) }
 
     # Step 3: Build trips from segments
-    trips = Trip.group_segments(segments, @base_airport)
+    Trip.group_segments(segments, @base_airport)
 
     # Step 4: Return trips
-    trips
   end
 
   def display_trips(trips)
-    trips.each { |trip| puts trip.to_s, '' }
+    trips.each { |trip| puts trip, '' }
   end
 
   private
@@ -39,7 +38,7 @@ class ItineraryProcessor
     input_file_content = File.read(file_path)
 
     segment_lines = []
-      
+
     input_file_content.each_line do |line|
       line = line.strip
       next if line.empty?
@@ -52,10 +51,10 @@ class ItineraryProcessor
 
   # Validate the IATA code
   def validate_iata(iata_code)
-    raise ItineraryErrors::InvalidIataCodeError, "IATA code is required" if iata_code.nil? || iata_code.empty?
+    raise ItineraryErrors::InvalidIataCodeError, 'IATA code is required' if iata_code.nil? || iata_code.empty?
 
-    unless iata_code.match?(IATA_CODE_REGEX)
-      raise ItineraryErrors::InvalidIataCodeError, "Invalid IATA code: #{iata_code}"
-    end
+    return if iata_code.match?(IATA_CODE_REGEX)
+
+    raise ItineraryErrors::InvalidIataCodeError, "Invalid IATA code: #{iata_code}"
   end
 end

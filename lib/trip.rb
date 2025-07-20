@@ -1,8 +1,8 @@
-# rubocop:disable all
+# frozen_string_literal: true
 
-require 'pry'
 require_relative 'segment'
 
+# Class that represents a trip, it contains a list of segments and a base airport
 class Trip
   attr_reader :segments, :base_airport
 
@@ -14,15 +14,18 @@ class Trip
 
   def self.group_segments(segments, base_airport)
     return [] if segments.empty?
-  
+
     # Sort all segments chronologically by start time to process them in order
     sorted = Segment.sort_by_date(segments)
 
     # each trip should start with a transport segment leaving the base IATA
     initial_point_segments = sorted.select { |segment| segment.departure_airport == base_airport }
-    raise ItineraryErrors::InvalidTripError, "There are no segments that start from the base IATA #{base_airport}" if initial_point_segments.empty?
+    if initial_point_segments.empty?
+      raise ItineraryErrors::InvalidTripError,
+            "There are no segments that start from the base IATA #{base_airport}"
+    end
 
-    sorted = sorted - initial_point_segments
+    sorted -= initial_point_segments
 
     trips = []
     # Process each initial segment that starts from base airport
@@ -39,13 +42,13 @@ class Trip
           # Next segment should happen from the same location and within 24 hours
           # Substracting Date objects returns a float number of days
           if segment.transport?
-            segment.departure_airport == current_location && 
-            segment.departure_time >= current_time &&
-            (segment.departure_time - current_time) <= 1.0
+            segment.departure_airport == current_location &&
+              segment.departure_time >= current_time &&
+              (segment.departure_time - current_time) <= 1.0
           else
             segment.arrival_airport == current_location &&
-            segment.check_in_date >= current_time.to_date &&
-            (segment.check_in_date - current_time.to_date) <= 1.0
+              segment.check_in_date >= current_time.to_date &&
+              (segment.check_in_date - current_time.to_date) <= 1.0
           end
         end
 
@@ -55,13 +58,12 @@ class Trip
         current_trip_segments << next_segment
         sorted.delete(next_segment)
 
-        if next_segment.transport?
-          current_location = next_segment.arrival_airport
-          current_time = next_segment.arrival_time
-        else
-          current_location = next_segment.arrival_airport
-          current_time = next_segment.check_out_date.to_datetime
-        end
+        current_location = next_segment.arrival_airport
+        current_time = if next_segment.transport?
+                         next_segment.arrival_time
+                       else
+                         next_segment.check_out_date.to_datetime
+                       end
       end
 
       # Add completed trip to trips array

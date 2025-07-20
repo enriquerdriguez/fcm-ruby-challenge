@@ -1,0 +1,59 @@
+AllCops:
+  NewCops: enable
+  Exclude:
+    - spec/**/*
+############################################ METRICS ############################################
+
+Metrics/BlockLength:
+  Max: 120
+  Exclude:
+    - spec/**/*
+
+Metrics/ModuleLength:
+  Max: 120
+  Exclude:
+    - spec/**/*
+
+Metrics/BlockNesting:
+  Max: 4
+
+Metrics/ClassLength:
+  Max: 150
+
+Metrics/MethodLength:
+  Enabled: true
+  Max: 20
+
+Metrics/AbcSize:
+  Enabled: true
+  Max: 12
+
+Metrics/CyclomaticComplexity:
+  Enabled: true
+  Max: 8
+
+Metrics/PerceivedComplexity:
+  Enabled: true
+  Max: 8
+
+###################################### STYLE ########################################
+
+Style/ReturnNil:
+  Enabled: true
+
+Style/StringLiterals:
+  ConsistentQuotesInMultiline: true
+
+Style/Documentation:
+  Enabled: true
+
+Style/FrozenStringLiteralComment:
+  Enabled: true
+
+####################################### REST OF RULES ###############################
+
+Layout/LineLength:
+  Max: 140
+
+Layout/SpaceBeforeFirstArg:
+  Enabled: true

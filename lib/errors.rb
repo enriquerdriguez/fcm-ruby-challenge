@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 # Custom error classes for the itinerary application
 module ItineraryErrors
   # Base error class for all itinerary-related errors
