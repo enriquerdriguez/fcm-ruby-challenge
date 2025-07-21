@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'set'
 require_relative 'segment'
 
 # Class that represents a trip, it contains a list of segments and a base airport
@@ -17,64 +18,42 @@ class Trip
     raise ItineraryErrors::InvalidTripError, "There are no segments that start from the base IATA #{base_airport}" if segments.empty?
   end
 
-  # Method to check if a segment is linked to the current location and time
-  def self.next_linked_segment?(segment, current_location, current_time)
-    return transport_segment_linked?(segment, current_location, current_time) if segment.transport?
-
-    hotel_segment_linked?(segment, current_location, current_time)
-  end
-
-  # Method to group segments into trips
-  # rubocop:disable all
-  # Time Complexity: O(n^2) where n is the number of segments
-  # - Initial sort of segments: O(n log n)
-  # - For each initial segment (worst case n/2):
-  #   - Inner while loop can process remaining segments (worst case n/2)
-  #   - Finding next linked segment is O(n) operation
-  # Space Complexity: O(n) for storing sorted segments and trips
+  # Method to group segments into trips using hash maps
   def self.group_segments(segments, base_airport)
     return [] if segments.empty?
 
-    # Sort all segments chronologically by start time to process them in order
-    sorted = Segment.sort_by_date(segments)
+    # Sort all segments chronologically by start time
+    sorted_segments = Segment.sort_by_date(segments)
 
-    # each trip should start with a transport segment leaving the base IATA
-    initial_point_segments = sorted.select { |segment| segment.departure_airport == base_airport }
-    validate_initial_point_segments(initial_point_segments, base_airport)
+    # Build hash maps for faster searches
+    segments_by_departure = build_departure_hash_map(sorted_segments)
+    segments_by_arrival = build_arrival_hash_map(sorted_segments)
 
-    sorted -= initial_point_segments
+    # Find initial segments that start from base airport
+    initial_segments = segments_by_departure[base_airport] || []
+    validate_initial_point_segments(initial_segments, base_airport)
 
+    # Build trips from initial segments
+    build_trips_from_initial_segments(initial_segments, segments_by_departure, segments_by_arrival, base_airport)
+  end
+
+  # Build trips from initial segments
+  def self.build_trips_from_initial_segments(initial_segments, segments_by_departure, segments_by_arrival, base_airport)
     trips = []
-    # Process each initial segment that starts from base airport
-    initial_point_segments.each do |initial_segment|
-      current_trip_segments = [initial_segment]
-      current_segment = current_trip_segments.last
-      current_location = current_segment.arrival_airport
-      current_time = current_segment.transport? ? current_segment.arrival_time : current_segment.check_out_date.to_datetime
+    used_segments = Set.new
 
-      # Keep looking for connected segments until we return to base or run out of segments
-      while current_location != base_airport && !sorted.empty?
-        # Find next segment that matches our current location and time
-        next_segment = sorted.find { |segment| next_linked_segment?(segment, current_location, current_time) }
+    # Process each initial segment
+    initial_segments.each do |initial_segment|
+      next if used_segments.include?(initial_segment)
 
-        break unless next_segment
+      trip_segments = build_trip_from_segment(initial_segment, segments_by_departure, segments_by_arrival, used_segments, base_airport)
 
-        # Add segment to trip and update current location/time
-        current_trip_segments << next_segment
-        sorted.delete(next_segment)
-
-        current_location = next_segment.arrival_airport
-        current_time = next_segment.transport? ? next_segment.arrival_time : next_segment.check_out_date.to_datetime
-      end
-
-      # Add completed trip to trips array
-      trips << Trip.new(segments: current_trip_segments, base_airport: base_airport)
+      trips << Trip.new(segments: trip_segments, base_airport: base_airport)
     end
 
     # Order trips by earliest date
     trips.sort_by(&:earliest_date)
   end
-  # rubocop:enable all
 
   # Find the earliest date from all segments
   def earliest_date
@@ -106,6 +85,84 @@ class Trip
   end
 
   private
+
+  # Build a hash map of segments indexed by departure airport
+  def self.build_departure_hash_map(segments)
+    segments.group_by(&:departure_airport)
+  end
+
+  # Build a hash map of segments indexed by arrival airport
+  def self.build_arrival_hash_map(segments)
+    segments.group_by(&:arrival_airport)
+  end
+
+  # Build a complete trip starting from a given segment
+  def self.build_trip_from_segment(initial_segment, segments_by_departure, segments_by_arrival, used_segments, base_airport)
+    trip_segments = [initial_segment]
+    used_segments.add(initial_segment)
+
+    # Set current segment date to find next linked segment
+    current_segment = initial_segment
+    current_location = current_segment.arrival_airport
+    current_time = get_segment_end_time(current_segment)
+
+    # Continue building trip until we return to base or can't find next segment
+    while current_location != base_airport
+      next_segment = find_next_linked_segment(current_location, current_time, segments_by_departure,
+                                              segments_by_arrival, used_segments)
+
+      break unless next_segment
+
+      trip_segments << next_segment
+      used_segments.add(next_segment)
+
+      current_location = next_segment.arrival_airport
+      current_time = get_segment_end_time(next_segment)
+    end
+
+    trip_segments
+  end
+
+  # Get the end time of a segment (arrival time for transport, check out for hotel)
+  def self.get_segment_end_time(segment)
+    segment.transport? ? segment.arrival_time : segment.check_out_date.to_datetime
+  end
+
+  # Method to find the next linked segment using hash maps
+  def self.find_next_linked_segment(current_location, current_time, segments_by_departure, segments_by_arrival, used_segments)
+    # First try to find transport segments departing from current location
+    next_transport = find_next_transport_segment(current_location, current_time, segments_by_departure, used_segments)
+    return next_transport if next_transport
+
+    # If no transport segment found, look for hotel segments at current location
+    find_next_hotel_segment(current_location, current_time, segments_by_arrival, used_segments)
+  end
+
+  # Find the next transport segment from current location
+  def self.find_next_transport_segment(current_location, current_time, segments_by_departure, used_segments)
+    transport_candidates = segments_by_departure[current_location]&.select do |segment|
+      segment.transport? && !used_segments.include?(segment)
+    end || []
+
+    transport_candidates.find do |segment|
+      transport_segment_linked?(segment, current_location, current_time)
+    end
+  end
+
+  # Find the next hotel segment at current location
+  def self.find_next_hotel_segment(current_location, current_time, segments_by_arrival, used_segments)
+    hotel_candidates = segments_by_arrival[current_location]&.select do |segment|
+      segment.hotel? && !used_segments.include?(segment)
+    end || []
+
+    hotel_candidates.find do |segment|
+      hotel_segment_linked?(segment, current_location, current_time)
+    end
+  end
+
+  private_class_method :build_departure_hash_map, :build_arrival_hash_map, :build_trip_from_segment,
+                       :get_segment_end_time, :find_next_linked_segment,
+                       :find_next_transport_segment, :find_next_hotel_segment, :build_trips_from_initial_segments
 
   # Determine the destination of the trip
   def determine_destination

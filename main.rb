@@ -14,6 +14,7 @@ class MainApp
   end
 
   def run
+    beginning_time = Time.now
     input_file = ARGV[0]
     base_airport = ENV['BASED']
 
@@ -32,7 +33,8 @@ class MainApp
       exit 1
     end
 
-
+    end_time = Time.now
+    puts "execution time: #{end_time - beginning_time} seconds"
   end
 end
 
