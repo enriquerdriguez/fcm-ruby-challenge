@@ -530,7 +530,6 @@ RSpec.describe Trip do
     end
   end
 
-  # New tests for the optimized methods and logic
   describe '.build_departure_hash_map' do
     let(:segment1) { double('Segment', departure_airport: 'SVQ') }
     let(:segment2) { double('Segment', departure_airport: 'SVQ') }

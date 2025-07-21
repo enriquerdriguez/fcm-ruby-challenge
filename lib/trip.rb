@@ -72,12 +72,14 @@ class Trip
     lines.join("\n")
   end
 
+  # Method to check if a transport segment is linked to the current location and time
   def self.transport_segment_linked?(segment, current_location, current_time)
     segment.departure_airport == current_location &&
       segment.departure_time >= current_time &&
       (segment.departure_time - current_time) <= 1.0
   end
 
+  # Method to check if a hotel segment is linked to the current location and time
   def self.hotel_segment_linked?(segment, current_location, current_time)
     segment.arrival_airport == current_location &&
       segment.check_in_date >= current_time.to_date &&

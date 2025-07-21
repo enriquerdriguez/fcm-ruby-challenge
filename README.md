@@ -257,3 +257,4 @@ While the current implementation handles the core requirements effectively, ther
 - **Factory Pattern**: Implement factory pattern for segment creation
 - **Trip Model**: I am aware that this class uses many class methods that seem like they should be part of a concern/module class for segments, but I wanted to make it easier for this particular exercise to find and read what has been done in that class, since the Trip class represents a group of segments that have to be linked following some logic.
 - **Logging**: Comprehensive logging for debugging and monitoring
+- **Testing**: Use Factories
