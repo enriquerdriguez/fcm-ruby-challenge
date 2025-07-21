@@ -37,6 +37,61 @@ RSpec.describe Segment do
         end.to raise_error(ItineraryErrors::InvalidSegmentError, /Hotel segments must have check-in and check-out dates/)
       end
     end
+
+    context 'invalid segment types' do
+      it 'raises error for invalid segment type' do
+        expect do
+          Segment.new(type: 'InvalidType', departure_airport: 'SVQ', arrival_airport: 'BCN',
+                     departure_time: DateTime.now, arrival_time: DateTime.now + Rational(1, 24))
+        end.to raise_error(ItineraryErrors::InvalidSegmentError, /Invalid segment type: InvalidType/)
+      end
+    end
+
+    context 'invalid IATA codes' do
+      it 'raises error for invalid departure airport code' do
+        expect do
+          Segment.new(type: 'Flight', departure_airport: 'SV', arrival_airport: 'BCN',
+                     departure_time: DateTime.now, arrival_time: DateTime.now + Rational(1, 24))
+        end.to raise_error(ItineraryErrors::InvalidSegmentError, /Invalid departure_airport: SV/)
+      end
+
+      it 'raises error for invalid arrival airport code' do
+        expect do
+          Segment.new(type: 'Flight', departure_airport: 'SVQ', arrival_airport: 'BC',
+                     departure_time: DateTime.now, arrival_time: DateTime.now + Rational(1, 24))
+        end.to raise_error(ItineraryErrors::InvalidSegmentError, /Invalid arrival_airport: BC/)
+      end
+
+      it 'raises error for lowercase IATA code' do
+        expect do
+          Segment.new(type: 'Flight', departure_airport: 'svq', arrival_airport: 'BCN',
+                     departure_time: DateTime.now, arrival_time: DateTime.now + Rational(1, 24))
+        end.to raise_error(ItineraryErrors::InvalidSegmentError, /Invalid departure_airport: svq/)
+      end
+
+      it 'raises error for invalid hotel airport code' do
+        expect do
+          Segment.new(type: 'Hotel', arrival_airport: 'BC',
+                     check_in_date: Date.today, check_out_date: Date.today + 1)
+        end.to raise_error(ItineraryErrors::InvalidSegmentError, /Invalid arrival_airport: BC/)
+      end
+    end
+
+    context 'hotel date validation' do
+      it 'raises error when check-in date is after check-out date' do
+        expect do
+          Segment.new(type: 'Hotel', arrival_airport: 'BCN',
+                     check_in_date: Date.today + 2, check_out_date: Date.today + 1)
+        end.to raise_error(ItineraryErrors::InvalidSegmentError, /Check-in date must be before check-out date/)
+      end
+
+      it 'raises error when check-in date equals check-out date' do
+        expect do
+          Segment.new(type: 'Hotel', arrival_airport: 'BCN',
+                     check_in_date: Date.today, check_out_date: Date.today)
+        end.to raise_error(ItineraryErrors::InvalidSegmentError, /Check-in date must be before check-out date/)
+      end
+    end
   end
 
   describe '#transport?' do
@@ -173,6 +228,165 @@ RSpec.describe Segment do
       expect(sorted).to eq([hotel, train, flight])
     end
   end
+
+  describe '.validate_segment_line' do
+    it 'validates correct segment format' do
+      line = 'SEGMENT: Flight SVQ 2023-03-02 06:40 -> BCN 09:10'
+      expect { Segment.validate_segment_line(line) }.not_to raise_error
+    end
+
+    it 'raises error for lines not starting with SEGMENT:' do
+      line = 'Flight SVQ 2023-03-02 06:40 -> BCN 09:10'
+      expect { Segment.validate_segment_line(line) }.to raise_error(ItineraryErrors::InvalidSegmentError, /Invalid segment format/)
+    end
+
+    it 'raises error for invalid segment type' do
+      line = 'SEGMENT: InvalidType SVQ 2023-03-02 06:40 -> BCN 09:10'
+      expect { Segment.validate_segment_line(line) }.to raise_error(ItineraryErrors::InvalidSegmentError, /Invalid segment type: InvalidType/)
+    end
+  end
+
+  describe '.parse_transport_segment' do
+    it 'parses flight segment correctly' do
+      parts = ['Flight', 'SVQ', '2023-03-02', '06:40', '->', 'BCN', '09:10']
+      segment = Segment.parse_transport_segment(parts)
+
+      expect(segment.type).to eq('Flight')
+      expect(segment.departure_airport).to eq('SVQ')
+      expect(segment.arrival_airport).to eq('BCN')
+      expect(segment.departure_time).to eq(DateTime.parse('2023-03-02 06:40'))
+      expect(segment.arrival_time).to eq(DateTime.parse('2023-03-02 09:10'))
+    end
+
+    it 'parses train segment correctly' do
+      parts = ['Train', 'SVQ', '2023-02-15', '09:30', '->', 'MAD', '11:00']
+      segment = Segment.parse_transport_segment(parts)
+
+      expect(segment.type).to eq('Train')
+      expect(segment.departure_airport).to eq('SVQ')
+      expect(segment.arrival_airport).to eq('MAD')
+      expect(segment.departure_time).to eq(DateTime.parse('2023-02-15 09:30'))
+      expect(segment.arrival_time).to eq(DateTime.parse('2023-02-15 11:00'))
+    end
+
+    it 'handles overnight flights correctly' do
+      parts = ['Flight', 'SVQ', '2023-03-02', '23:40', '->', 'BCN', '02:10']
+      segment = Segment.parse_transport_segment(parts)
+
+      expect(segment.departure_time).to eq(DateTime.parse('2023-03-02 23:40'))
+      expect(segment.arrival_time).to eq(DateTime.parse('2023-03-03 02:10'))
+    end
+  end
+
+  describe '.parse_hotel_segment' do
+    it 'parses hotel segment correctly' do
+      parts = ['Hotel', 'BCN', '2023-01-05', '->', '2023-01-10']
+      segment = Segment.parse_hotel_segment(parts)
+
+      expect(segment.type).to eq('Hotel')
+      expect(segment.arrival_airport).to eq('BCN')
+      expect(segment.check_in_date).to eq(Date.parse('2023-01-05'))
+      expect(segment.check_out_date).to eq(Date.parse('2023-01-10'))
+    end
+  end
+
+  describe '.extract_transport_attributes' do
+    it 'extracts attributes for regular flight' do
+      parts = ['Flight', 'SVQ', '2023-03-02', '06:40', '->', 'BCN', '09:10']
+      attributes = Segment.extract_transport_attributes(parts)
+
+      expect(attributes[:type]).to eq('Flight')
+      expect(attributes[:departure_airport]).to eq('SVQ')
+      expect(attributes[:arrival_airport]).to eq('BCN')
+      expect(attributes[:departure_time]).to eq(DateTime.parse('2023-03-02 06:40'))
+      expect(attributes[:arrival_time]).to eq(DateTime.parse('2023-03-02 09:10'))
+    end
+
+    it 'handles overnight flights by adding one day to arrival' do
+      parts = ['Flight', 'SVQ', '2023-03-02', '23:40', '->', 'BCN', '02:10']
+      attributes = Segment.extract_transport_attributes(parts)
+
+      expect(attributes[:departure_time]).to eq(DateTime.parse('2023-03-02 23:40'))
+      expect(attributes[:arrival_time]).to eq(DateTime.parse('2023-03-03 02:10'))
+    end
+  end
+
+  describe '.extract_hotel_attributes' do
+    it 'extracts hotel attributes correctly' do
+      parts = ['Hotel', 'BCN', '2023-01-05', '->', '2023-01-10']
+      attributes = Segment.extract_hotel_attributes(parts)
+
+      expect(attributes[:type]).to eq('Hotel')
+      expect(attributes[:arrival_airport]).to eq('BCN')
+      expect(attributes[:check_in_date]).to eq(Date.parse('2023-01-05'))
+      expect(attributes[:check_out_date]).to eq(Date.parse('2023-01-10'))
+    end
+  end
+
+  describe '.parse_datetime' do
+    it 'parses valid datetime string' do
+      datetime_str = '2023-03-02 06:40'
+      result = Segment.parse_datetime(datetime_str)
+      expect(result).to eq(DateTime.parse('2023-03-02 06:40'))
+    end
+
+    it 'raises error for nil datetime string' do
+      expect { Segment.parse_datetime(nil) }.to raise_error(RuntimeError, /Datetime cannot be nil/)
+    end
+
+    it 'raises error for invalid datetime format' do
+      expect { Segment.parse_datetime('invalid-datetime') }.to raise_error(ItineraryErrors::DateTimeParseError, /Invalid datetime format/)
+    end
+  end
+
+  describe '.parse_date' do
+    it 'parses valid date string' do
+      date_str = '2023-01-05'
+      result = Segment.parse_date(date_str)
+      expect(result).to eq(Date.parse('2023-01-05'))
+    end
+
+    it 'raises error for nil date string' do
+      expect { Segment.parse_date(nil) }.to raise_error(ItineraryErrors::DateTimeParseError, /Invalid date format for nil/)
+    end
+
+    it 'raises error for invalid date format' do
+      expect { Segment.parse_date('invalid-date') }.to raise_error(ItineraryErrors::DateTimeParseError, /Invalid date format/)
+    end
+  end
+
+  describe '.create_segment' do
+    it 'creates a new segment with given attributes' do
+      attributes = {
+        type: 'Flight',
+        departure_airport: 'SVQ',
+        arrival_airport: 'BCN',
+        departure_time: DateTime.parse('2023-03-02 06:40'),
+        arrival_time: DateTime.parse('2023-03-02 09:10')
+      }
+
+      segment = Segment.create_segment(attributes)
+      expect(segment).to be_a(Segment)
+      expect(segment.type).to eq('Flight')
+      expect(segment.departure_airport).to eq('SVQ')
+      expect(segment.arrival_airport).to eq('BCN')
+    end
+  end
+
+  describe '.overnight_flight?' do
+    it 'returns true for overnight flight' do
+      departure_time = DateTime.parse('2023-03-02 23:40')
+      arrival_time = DateTime.parse('2023-03-02 02:10')
+      expect(Segment.overnight_flight?(departure_time, arrival_time)).to be true
+    end
+
+    it 'returns false for same-day flight' do
+      departure_time = DateTime.parse('2023-03-02 06:40')
+      arrival_time = DateTime.parse('2023-03-02 09:10')
+      expect(Segment.overnight_flight?(departure_time, arrival_time)).to be false
+    end
+  end
+
   describe '.parse' do
     context 'with valid transport segments' do
       it 'parses a flight segment correctly' do
