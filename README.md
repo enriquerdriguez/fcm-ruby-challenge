@@ -20,6 +20,7 @@ This repository contains the implementation of an itinerary processing system fo
 - Ruby (version 3.1.4)
 - Bundler for dependency management
 - RSpec for testing (included in Gemfile)
+- Docker (optional)
 
 ## Getting Started
 
@@ -63,7 +64,58 @@ Follow these steps to get the project up and running:
 - **DateTime Handling**: Robust parsing with proper error handling for malformed dates
 - **Connection Logic**: Implements 24-hour connection window for transport segments
 - **Sorting Strategy**: Chronological sorting by departure time for transport and check-in date for hotels
-- **Memory Efficiency**: Processes segments in a single pass to minimize memory usage
+- **Memory Efficiency**: Processes segments in a single pass to minimize memory usage and uses optimal search for grouping segments into trips
+
+### Performance Considerations
+
+When thinking about the solution for this challenge, the first thing that came to my mind was to filter segments by the initial point and then loop through the rest of the segments to find the next linked segment.
+My first approach looked like this:
+```bash
+  def self.group_segments(segments, base_airport)
+    return [] if segments.empty?
+
+    # Sort all segments chronologically by start time to process them in order
+    sorted = Segment.sort_by_date(segments)
+
+    # each trip should start with a transport segment leaving the base IATA
+    initial_point_segments = sorted.select { |segment| segment.departure_airport == base_airport }
+    validate_initial_point_segments(initial_point_segments, base_airport)
+
+    sorted -= initial_point_segments
+
+    trips = []
+    # Process each initial segment that starts from base airport
+    initial_point_segments.each do |initial_segment|
+      current_trip_segments = [initial_segment]
+      current_segment = current_trip_segments.last
+      current_location = current_segment.arrival_airport
+      current_time = current_segment.transport? ? current_segment.arrival_time : current_segment.check_out_date.to_datetime
+
+      # Keep looking for connected segments until we return to base or run out of segments
+      while current_location != base_airport && !sorted.empty?
+        # Find next segment that matches our current location and time
+        next_segment = sorted.find { |segment| next_linked_segment?(segment, current_location, current_time) }
+
+        break unless next_segment
+
+        # Add segment to trip and update current location/time
+        current_trip_segments << next_segment
+        sorted.delete(next_segment)
+
+        current_location = next_segment.arrival_airport
+        current_time = next_segment.transport? ? next_segment.arrival_time : next_segment.check_out_date.to_datetime
+      end
+
+      # Add completed trip to trips array
+      trips << Trip.new(segments: current_trip_segments, base_airport: base_airport)
+    end
+
+    # Order trips by earliest date
+    trips.sort_by(&:earliest_date)
+  end
+```
+
+But after it was working, I realized it was not the most optimal solution. The search for the next linked segment could be improved by using hash maps to filter by IATA and then checking if the segment was already used. So I decided to refactor the code to use that approach, improving the execution times.
 
 ## Usage
 
@@ -76,7 +128,7 @@ BASED=SVQ bundle exec ruby main.rb input.txt
 
 ### Docker
 
-This application can be run in docker. For that you only need to run the following commands:
+This application can be run in Docker. For that, you only need to run the following commands:
 
 ```bash
 docker-compose build
@@ -121,11 +173,6 @@ Train from MAD to SVQ at 2023-02-17 17:00 to 19:30
 
 ## Features
 
-### Supported Segment Types
-- **Flight**: Air travel segments with departure/arrival times
-- **Train**: Rail travel segments with departure/arrival times  
-- **Hotel**: Accommodation segments with check-in/check-out dates
-
 ### Trip Grouping Logic
 - **Connection Detection**: Automatically groups segments that are within 24 hours of each other
 - **Destination Determination**: Identifies the final destination of each trip
@@ -140,8 +187,7 @@ Train from MAD to SVQ at 2023-02-17 17:00 to 19:30
 
 ## Testing
 
-Tests were written using the library rspec. I tried to cover every method with unit tests and also some integration tests.
-
+Tests were written using the RSpec library. I tried to cover every method with unit tests and also included some integration tests.
 
 ### Running Tests
 ```bash
@@ -152,8 +198,8 @@ bundle exec rspec
 bundle exec rspec spec/lib/segment_spec.rb
 bundle exec rspec spec/integration_spec.rb
 ```
-### Running tests with docker
 
+### Running Tests with Docker
 
 ```bash
 docker-compose build
@@ -163,19 +209,19 @@ docker-compose run fcm-app bash
 bundle exec rspec
 ```
 
-### Integration tests
-I added some particular scenarios that could happen with wrong inputs. They are inside the inputs folder. They can be run both with Rspec or a rake task.
+### Integration Tests
+I added some particular scenarios that could happen with wrong inputs. They are inside the inputs folder. They can be run both with RSpec or a rake task.
 
 ```bash
 # Normal bash
 bundle exec rspec spec/integration_spec.rb
 
-# docker
+# Docker
 docker-compose build
 docker-compose run fcm-app bash
 bundle exec rspec spec/integration_spec.rb
 
-# rake task
+# Rake task
 bundle exec rake run_test_inputs
 ```
 
@@ -197,6 +243,17 @@ The application implements a comprehensive error hierarchy:
 - Logical date errors (check-out before check-in)
 - Missing base airport segments
 
-## Performance Considerations
-## Future Improvements
 ## General Observations
+
+The solution prioritizes **readability**, **maintainability**, **extensibility**, and **efficiency**. The code structure allows for easy addition of new segment types and modification of grouping logic without significant refactoring.
+
+The error handling is comprehensive, providing clear feedback for various failure scenarios. The test coverage ensures reliability and helps prevent regressions during future development.
+
+While the current implementation handles the core requirements effectively, there are opportunities to improve this code.
+
+### Future Improvements
+
+#### Code Quality Improvements
+- **Factory Pattern**: Implement factory pattern for segment creation
+- **Trip Model**: I am aware that this class uses many class methods that seem like they should be part of a concern/module class for segments, but I wanted to make it easier for this particular exercise to find and read what has been done in that class, since the Trip class represents a group of segments that have to be linked following some logic.
+- **Logging**: Comprehensive logging for debugging and monitoring
