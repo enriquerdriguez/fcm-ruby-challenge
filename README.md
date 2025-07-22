@@ -1,19 +1,18 @@
 # README
 # FCM Digital - Ruby Technical Challenge
 
-This repository contains the implementation of an itinerary processing system for FCM Digital, which transforms raw reservation data into organized trip itineraries. The system processes flight, train, and hotel segments to create comprehensive trip representations based on a user's base airport.
+This repository contains the implementation of an itinerary processing system for the [FCM Digital code challenge](https://github.com/fcm-digital/ruby_technical_challenge), which transforms raw reservation data into organized trip itineraries. The system processes flight, train, and hotel segments to create comprehensive trip representations based on a user's base airport.
 
 ## Table of Contents
 
 - [Requirements](#requirements)
 - [Getting Started](#getting-started)
-- [Technical Decisions & Architecture](#technical-decisions)
+- [Technical Decisions & Architecture](#technical-decisions--architecture)
 - [Usage](#usage)
 - [Features](#features)
 - [Testing](#testing)
 - [Error Handling](#error-handling)
-- [Performance Considerations](#performance)
-- [Future Improvements](#improvements)
+- [General Observations](#general-observations)
 
 ## Requirements
 
@@ -68,7 +67,7 @@ Follow these steps to get the project up and running:
 
 ### Performance Considerations
 
-When thinking about the solution for this challenge, the first thing that came to my mind was to filter segments by the initial point and then loop through the rest of the segments to find the next linked segment.
+When thinking about the solution for this challenge, the first thing that came to mind was to filter segments by the initial point and then loop through the rest of the segments to find the next linked segment.
 My first approach looked like this:
 ```bash
   def self.group_segments(segments, base_airport)
@@ -124,6 +123,15 @@ The application processes input files containing reservation segments and output
 
 ```bash
 BASED=SVQ bundle exec ruby main.rb input.txt
+```
+
+### Rake Tasks
+I have also created some rake tasks to make it easier to run various scenarios and tests:
+
+```bash
+rake run # Will run BASED=SVQ bundle exec ruby main.rb input.txt
+rake run_test_inputs # Will run scenarios in the inputs folder
+rake test # Will run rspecs
 ```
 
 ### Docker
@@ -205,12 +213,12 @@ bundle exec rspec spec/integration_spec.rb
 docker-compose build
 docker-compose run fcm-app bash
 
-# Execute normal usage inside the bash
+# Execute tests inside the bash
 bundle exec rspec
 ```
 
 ### Integration Tests
-I added some particular scenarios that could happen with wrong inputs. They are inside the inputs folder. They can be run both with RSpec or a rake task.
+I added some particular scenarios that could happen with incorrect inputs. They are inside the inputs folder. They can be run both with RSpec or a rake task.
 
 ```bash
 # Normal bash
@@ -255,6 +263,15 @@ While the current implementation handles the core requirements effectively, ther
 
 #### Code Quality Improvements
 - **Factory Pattern**: Implement factory pattern for segment creation
-- **Trip Model**: I am aware that this class uses many class methods that seem like they should be part of a concern/module class for segments, but I wanted to make it easier for this particular exercise to find and read what has been done in that class, since the Trip class represents a group of segments that have to be linked following some logic.
+- **Trip Model**: I chose to keep all the trip-building logic within the Trip class rather than extracting it into concerns or modules. This decision was made with the following considerations:
+  - **Reviewer-friendly**: All the trip-building algorithm is visible in one place, making it easy for reviewers to understand the complete logic
+  - **Time-efficient**: Focuses on solving the core problem rather than over-engineering the architecture
+  - **Clear algorithm flow**: The entire trip-building process is easy to follow and trace
+  - **Production considerations:**
+      In a production environment, I would refactor this by:
+      - Extracting trip-building logic into a `TripBuilderService` or similar service object
+      - Creating separate concerns for different aspects (e.g., `SegmentLinking`, `TripValidation`)
+      - Making individual components more testable and maintainable
+      - Following better separation of concerns principles
 - **Logging**: Comprehensive logging for debugging and monitoring
 - **Testing**: Use Factories
